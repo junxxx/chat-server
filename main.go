@@ -13,24 +13,37 @@ import (
 
 var addr = flag.String("addr", ":8080", "http service address")
 
-func serveHome(w http.ResponseWriter, r *http.Request) {
+func setNickname(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.URL)
-	if r.URL.Path != "/" {
+	if r.URL.Path != "/setNickname" {
 		http.Error(w, "Not found", http.StatusNotFound)
 		return
 	}
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+	r.ParseForm()
+	cookie := &http.Cookie{
+		Name:     "nickname",
+		Value:    r.Form.Get("nickname"),
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
 	}
-	http.ServeFile(w, r, "home.html")
+	http.SetCookie(w, cookie)
+}
+
+func getNickname(r *http.Request) string {
+	cookie, err := r.Cookie("nickname")
+	if err != nil {
+		log.Println(err)
+		return ""
+	}
+	return cookie.Value
 }
 
 func main() {
 	flag.Parse()
 	hub := newHub()
 	go hub.run()
-	http.HandleFunc("/", serveHome)
+	http.HandleFunc("/setNickname", setNickname)
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		serveWs(hub, w, r)
 	})

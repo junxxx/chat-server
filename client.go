@@ -5,7 +5,6 @@
 package main
 
 import (
-	"bytes"
 	"log"
 	"net/http"
 	"time"
@@ -29,10 +28,12 @@ const (
 
 var (
 	newline = []byte{'\n'}
-	space   = []byte{' '}
 )
 
-var origins = []string{"http://127.0.0.1:64600", "http://localhost:64600"}
+var origins = []string{
+	"http://127.0.0.1:64600", "http://localhost:64600",
+	"http://127.0.0.1:8080", "http://localhost:8080",
+}
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -59,6 +60,12 @@ type Client struct {
 	send chan []byte
 }
 
+type Message struct {
+	From    *Client
+	To      *Hub
+	Content []byte
+}
+
 // readPump pumps messages from the websocket connection to the hub.
 //
 // The application runs readPump in a per-connection goroutine. The application
@@ -80,8 +87,8 @@ func (c *Client) readPump() {
 			}
 			break
 		}
-		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
-		c.hub.broadcast <- message
+		log.Println("message from ", c, message)
+		c.hub.broadcast <- Message{From: c, To: c.hub, Content: message}
 	}
 }
 
@@ -138,6 +145,8 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
+	nickname := getNickname(r)
+	log.Println("nickname from cookie", nickname)
 	client := &Client{hub: hub, conn: conn, send: make(chan []byte, 256)}
 	client.hub.register <- client
 
